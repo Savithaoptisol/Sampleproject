@@ -15,3 +15,6 @@ res=sobj1-sobj2
 print(res)
 res=sobj1>sobj2
 print(res)
+
+nam="savi"
+print(nam)
