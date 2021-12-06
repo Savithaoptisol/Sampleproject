@@ -1,0 +1,55 @@
+public async Task<IActionResult> Login(DtoPostInput objLogin)
+{
+try
+{
+string inputString = Utilities.DecryptFrontEndData(objLogin.objLogin);
+DtoLogin model = JsonConvert.DeserializeObject<DtoLogin>(inputString);
+var user = await _userManager.FindByNameAsync(model.UserName);
+var dtouser = dbContext.Users.Where(x => x.AuthId == user.Id).FirstOrDefault();
+if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
+{
+_logger.LogInformation(string.Format("Login Succeed for {0}/{1}", model.Email, model.Password));
+var tokenDescriptor = new SecurityTokenDescriptor
+{
+
+
+
+Subject = new ClaimsIdentity(new Claim[]
+{
+new Claim("UserID",user.Id.ToString()),
+new Claim("UserLoginId",dtouser.UserId.ToString()),
+new Claim("PlantId",dtouser.PlantId==null?"0":dtouser.PlantId.ToString())
+}
+),
+Expires = DateTime.UtcNow.AddDays(1),
+SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_DtoToken.JWT_Secret)), SecurityAlgorithms.HmacSha256Signature)
+};
+var tokenHandler = new JwtSecurityTokenHandler();
+var securityToken = tokenHandler.CreateToken(tokenDescriptor);
+var token = tokenHandler.WriteToken(securityToken);
+
+var username = dtouser.FirstName.Substring(0,1).ToUpper() + dtouser.LastName.Substring(0, 1).ToUpper();
+var pagelist = new MRFPlantPortalDAL.BusinessRules.Roles.Roles().GetPages(dtouser.RoleId);
+var applicationlist = new MRFPlantPortalDAL.BusinessRules.User.User().GetApplicationByUserId(dtouser.UserId);
+int pemsrole = new MRFPlantPortalDAL.BusinessRules.Roles.Roles().GetPemscount(dtouser.UserId);
+int rmrole = new MRFPlantPortalDAL.BusinessRules.Roles.Roles().GetRmscount(dtouser.UserId);
+int mcmrole = new MRFPlantPortalDAL.BusinessRules.Roles.Roles().GetMcmcount(dtouser.UserId);
+return StatusCode(StatusCodes.Status200OK, new { token=token,username=username,email=dtouser.Email,pageList=pagelist,roleId= dtouser.RoleId,id= dtouser.UserId,plantId=dtouser.PlantId ,applicationList=applicationlist,pemscount= pemsrole,rmcount=rmrole,mcmcount=mcmrole });
+}
+}
+
+
+
+catch (Exception ex)
+{
+Log.WriteLog("MRFPlantPortalServices : Controllers : AccountController", "Login", ex);
+
+
+
+return StatusCode(StatusCodes.Status501NotImplemented);
+}
+string messageDetailsLog = MessageDetail.GetItemByMessageCode(CustomMessage.CM0007).Messages;
+
+return StatusCode(StatusCodes.Status501NotImplemented, new { Message = "Invalid Credentials" });
+
+}
